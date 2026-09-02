@@ -1,0 +1,242 @@
+import processing.serial.*;
+
+Serial myPort;
+
+String data = "";
+String noObject;
+int iAngle = 90;      
+int iDistance = 0;    
+int currentMode = 1; 
+
+PFont orcFont;
+int oldAngle = 90;
+boolean silecekSolaGidiyor = true; 
+
+final float MAX_DISTANCE_CM = 40.0;     
+final float MAX_RADIUS_PX = 900.0;      
+
+void setup() {
+  size(1920, 1080);
+  smooth();
+ 
+  String portName = "COM3"; // DİKKAT: Kendi portunu yazmayı unutma!
+  myPort = new Serial(this, portName, 9600);
+  myPort.bufferUntil('.'); 
+ 
+  orcFont = createFont("Arial Bold", 48);
+}
+
+void draw() {
+  fill(98, 245, 31);
+  textFont(orcFont);
+ 
+  noStroke();
+  fill(0, 4);
+  rect(0, 0, width, height);
+ 
+  drawRadar();
+  drawLine();
+  drawObject();
+  drawText();
+  drawModeIndicator(); 
+}
+
+void serialEvent(Serial myPort) {
+  try {
+    data = myPort.readStringUntil('.');
+    if (data != null) {
+      data = trim(data);
+      if (data.length() > 0 && data.charAt(data.length() - 1) == '.') {
+        data = data.substring(0, data.length() - 1);
+      }
+     
+      String[] parts = split(data, ',');
+     
+      if (parts.length >= 2) {
+        String angleStr = trim(parts[0]);
+        String distanceStr = trim(parts[1]);
+        
+        if (angleStr.length() > 0) {
+          int parsedAngle = Integer.parseInt(angleStr);
+          if (parsedAngle > oldAngle) silecekSolaGidiyor = true;  
+          else if (parsedAngle < oldAngle) silecekSolaGidiyor = false; 
+          oldAngle = parsedAngle;
+          iAngle = parsedAngle;
+        }
+       
+        if (distanceStr.length() > 0) {
+          iDistance = Integer.parseInt(distanceStr);
+        }
+        
+        if (parts.length >= 3) {
+          String modeStr = trim(parts[2]);
+          if (modeStr.length() > 0) {
+            currentMode = Integer.parseInt(modeStr);
+          }
+        }
+      }
+    }
+  } catch (Exception e) {
+   
+  }
+}
+
+void drawModeIndicator() {
+  pushMatrix();
+  translate(40, 40); 
+  
+  fill(0, 200);
+  
+  if (currentMode == 1) {
+    stroke(98, 245, 31); 
+  } else {
+    stroke(255, 150, 0); 
+  }
+  
+  strokeWeight(2);
+  rect(0, 0, 420, 110, 8); 
+  
+  fill(0, 255, 255); 
+  textSize(20);
+  text("SİSTEM MODU", 20, 35);
+  
+  stroke(255, 100);
+  strokeWeight(1);
+  line(20, 45, 400, 45);
+  
+  textSize(32);
+  if (currentMode == 1) {
+    fill(98, 245, 31);
+    text("GENEL TARAMA", 20, 85);
+  } else if (currentMode == 2) {
+    fill(255, 150, 0);
+    text("AKTİF TAKİP (KİLİTLENME)", 20, 85); 
+  } else {
+    fill(255);
+    text("BİLİNMİYOR", 20, 85);
+  }
+  
+  popMatrix();
+}
+
+void drawRadar() {
+  pushMatrix();
+  translate(960, 1000); 
+  noFill();
+  strokeWeight(2);
+  stroke(98, 245, 31);
+ 
+  arc(0, 0, 1800, 1800, PI, TWO_PI);
+  arc(0, 0, 1400, 1400, PI, TWO_PI);
+  arc(0, 0, 1000, 1000, PI, TWO_PI);
+  arc(0, 0, 600, 600, PI, TWO_PI);
+ 
+  line(-960, 0, 960, 0);
+  line(0, 0, -960*cos(radians(30)), -960*sin(radians(30)));
+  line(0, 0, -960*cos(radians(60)), -960*sin(radians(60)));
+  line(0, 0, -960*cos(radians(90)), -960*sin(radians(90)));
+  line(0, 0, -960*cos(radians(120)), -960*sin(radians(120)));
+  line(0, 0, -960*cos(radians(150)), -960*sin(radians(150)));
+  line(-960*cos(radians(30)), 0, 960, 0);
+  
+  strokeWeight(3);
+  stroke(50, 200, 50, 150);
+  line(0, 0, 0, -960);
+  popMatrix();
+}
+
+void drawObject() {
+  pushMatrix();
+  translate(960, 1000);
+  float pixsDistance = map(iDistance, 0, MAX_DISTANCE_CM, 0, MAX_RADIUS_PX);
+  
+  if (iDistance > 0 && iDistance <= MAX_DISTANCE_CM) {
+    float objX = pixsDistance * cos(radians(iAngle));
+    float objY = -pixsDistance * sin(radians(iAngle));
+    
+    if (iDistance <= 15) {
+      stroke(255, 30, 30); fill(255, 30, 30, 150);
+    } else {
+      stroke(255, 200, 0); fill(255, 200, 0, 150);
+    }
+
+    strokeWeight(9);
+    line(objX, objY, MAX_RADIUS_PX * cos(radians(iAngle)), -MAX_RADIUS_PX * sin(radians(iAngle)));
+    
+    strokeWeight(3);
+    ellipse(objX, objY, 40, 40); 
+    line(objX - 25, objY, objX + 25, objY);
+    line(objX, objY - 25, objX, objY + 25);
+    
+    pushMatrix();
+    translate(objX, objY);
+    int kutuX = 0; int yaziX = 0;
+    
+    if (silecekSolaGidiyor) {
+      kutuX = 20; yaziX = 30;
+    } else {
+      kutuX = -260; yaziX = -250;
+    }
+    
+    fill(0, 180); noStroke();
+    rect(kutuX, -45, 240, 65, 5); 
+    fill(0, 255, 255); textSize(18);
+    text("HEDEF BULUNDU!", yaziX, -20);
+    
+    int cartX = (int)(iDistance * cos(radians(iAngle)));
+    int cartY = (int)(iDistance * sin(radians(iAngle)));
+    
+    fill(255); textSize(15);
+    text("MESAFE: " + iDistance + " cm", yaziX, 0);
+    text("KONUM: [X:" + cartX + " Y:" + cartY + "]", yaziX, 15);
+    popMatrix();
+  }
+  popMatrix();
+}
+
+void drawLine() {
+  pushMatrix();
+  translate(960, 1000);
+  strokeWeight(9);
+  stroke(30, 250, 60); 
+  line(0, 0, 950 * cos(radians(iAngle)), -950 * sin(radians(iAngle)));
+  popMatrix();
+}
+
+void drawText() {
+  pushMatrix();
+  fill(0); noStroke(); rect(0, 1010, width, 70);
+  fill(98, 245, 31); textSize(25);
+  text("10cm", 1180, 990); text("20cm", 1380, 990);
+  text("30cm", 1580, 990); text("40cm", 1780, 990);
+ 
+  textSize(35);
+  if (iDistance < 40 && iDistance > 0) {
+    fill(255, 50, 50); noObject = "HEDEF BULUNDU!";
+  } else {
+    fill(98, 245, 31); noObject = "TARANIYOR...";
+  }
+  text("DURUM: " + noObject, 50, 1050);
+  
+  fill(98, 245, 31);
+  text("AÇI: " + iAngle + "°", 700, 1050);
+  
+  if (iDistance < 40 && iDistance > 0) {
+    text("MESAFE: " + iDistance + " cm", 1200, 1050);
+  } else {
+    text("MESAFE: --", 1200, 1050);
+  }
+ 
+  textSize(25); fill(98, 245, 60);
+  translate(961 + 960 * cos(radians(30)), 982 - 960 * sin(radians(30)));
+  rotate(-radians(60)); text("30°", 0, 0); resetMatrix();
+  translate(954 + 960 * cos(radians(60)), 984 - 960 * sin(radians(60)));
+  rotate(-radians(30)); text("60°", 0, 0); resetMatrix();
+  translate(945 + 960 * cos(radians(90)), 990 - 960 * sin(radians(90)));
+  text("90°", 0, 0); resetMatrix();
+  translate(935 + 960 * cos(radians(120)), 1003 - 960 * sin(radians(120)));
+  rotate(radians(-30)); text("120°", 0, 0); resetMatrix();
+  translate(940 + 960 * cos(radians(150)), 1018 - 960 * sin(radians(150)));
+  rotate(radians(-60)); text("150°", 0, 0); resetMatrix();
+  popMatrix();
+}
